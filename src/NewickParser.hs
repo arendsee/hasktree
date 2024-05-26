@@ -9,7 +9,7 @@ module NewickParser
     ) where
 
 import Data.Attoparsec.Text
-import Data.Text (Text, singleton)
+import Data.Text (Text, singleton, stripEnd)
 import Control.Applicative ((<|>))
 
 -- Define a data type to represent the Newick tree structure
@@ -25,10 +25,22 @@ parseNewick txt =
     (Partial _) -> Left "Incomplete tree provided"
     (Done _ tree) -> Right tree
 
+-- ========== PARSERS =========================================================
+-- Every parser is responsible for consuming internal space (as needed) and
+-- trailing space, but NOT leading space.
+
+charS :: Char -> Parser Char
+charS c = do
+  x <- char c
+  _ <- skipSpace
+  return x
+
 newickParser :: Parser Tree
 newickParser = do
+  -- This is one case where leading space needs to be consumed
+  _ <- skipSpace
   (tree, _) <- treeParser 
-  _ <- char ';'
+  _ <- charS ';'
   return tree
 
 treeParser :: Parser (Tree, Maybe Double)
@@ -43,17 +55,21 @@ leafParser = do
 -- ((A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F:0.6,G:0.7)H:0.8;
 nodeParser :: Parser (Tree, Maybe Double)
 nodeParser = do
-  _ <- char '('
-  children <- sepBy1 treeParser (char ',')
-  _ <- char ')'
+  _ <- charS '('
+  children <- sepBy1 treeParser (charS ',')
+  _ <- charS ')'
   mayName <- optional nameParser
   mayLength <- optional lengthParser
   return (Node children mayName, mayLength)
   
 nameParser :: Parser Text
-nameParser = quotedName '"' <|> quotedName '\'' <|> unquotedName where
+nameParser = do
+  name <- quotedName '"' <|> quotedName '\'' <|> unquotedName
+  _ <- skipSpace
+  return name
+  where
   unquotedName :: Parser Text
-  unquotedName = takeWhile1 (notInClass ",():;'\"")
+  unquotedName = stripEnd <$> takeWhile1 (notInClass ",():;'\"")
 
   quotedName :: Char -> Parser Text
   quotedName quoteChar = do
@@ -71,7 +87,11 @@ nameParser = quotedName '"' <|> quotedName '\'' <|> unquotedName where
     return $ singleton c
 
 lengthParser :: Parser Double
-lengthParser = ":" >> double
+lengthParser = do
+  _ <- charS ':'
+  x <- double
+  _ <- skipSpace
+  return x
 
 -- This parser always succeeds, even when no input is consumed. This will lead
 -- to an infinite loop for non-matching types when used with repeated parsers
