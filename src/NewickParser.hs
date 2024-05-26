@@ -19,11 +19,7 @@ data Tree
   deriving (Show, Ord, Eq)
 
 parseNewick :: Text -> Either String Tree
-parseNewick txt =
-  case parse newickParser txt of
-    (Fail _ context errMsg) -> Left $ unlines (errMsg : context)
-    (Partial _) -> Left "Incomplete tree provided"
-    (Done _ tree) -> Right tree
+parseNewick = parseOnly newickParser
 
 -- ========== PARSERS =========================================================
 -- Every parser is responsible for consuming internal space (as needed) and
@@ -52,7 +48,6 @@ leafParser = do
   mayLength <- optional lengthParser
   return (Leaf leaf, mayLength)
 
--- ((A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F:0.6,G:0.7)H:0.8;
 nodeParser :: Parser (Tree, Maybe Double)
 nodeParser = do
   _ <- charS '('

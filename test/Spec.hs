@@ -17,6 +17,9 @@ isJust :: Maybe a -> Bool
 isJust (Just _) = True
 isJust _ = False
 
+passes :: Parser a -> Text -> Expectation
+passes p txt = isJust (parseMaybe p txt) `shouldBe` True
+
 fails :: Parser a -> Text -> Expectation
 fails p txt = isJust (parseMaybe p txt) `shouldBe` False
 
@@ -52,7 +55,9 @@ spec = do
       parseMaybe newickParser "(A:1,B:2)n1:3;" `shouldBe` Just (Node [(Leaf "A", Just 1), (Leaf "B", Just 2)] (Just "n1"))
       parseMaybe newickParser "(草泥马:1,Unicorn:2)n1:3;" `shouldBe` Just (Node [(Leaf "草泥马", Just 1), (Leaf "Unicorn", Just 2)] (Just "n1"))
       -- spaces may be present between all nodes
-      parseMaybe newickParser " ( A : 1 , B : 2 ) n1 : 3 ; " `shouldBe` Just (Node [(Leaf "A", Just 1), (Leaf "B", Just 2)] (Just "n1"))
+      parseMaybe newickParser " ( A : 1 , B : 2 ) n1 : 3 ; \n" `shouldBe` Just (Node [(Leaf "A", Just 1), (Leaf "B", Just 2)] (Just "n1"))
+      -- largish
+      passes newickParser "((A:0.1,B:0.2,(C:0.3,D:0.4)E:0.5)F:0.6,G:0.7)H:0.8;"
 
     it "fails to parse an invalid Newick string" $ do
       fails newickParser "bad tree"
